@@ -1,18 +1,18 @@
 use std::{rc::Rc, cell::RefCell};
 use native_windows_gui as nwg;
 use winapi::um::winuser::{
-    GetSystemMetrics, SetTimer, KillTimer, 
-    SM_CXSCREEN, SM_CYSCREEN, WS_EX_TOOLWINDOW
+    SetTimer, KillTimer, WS_EX_TOOLWINDOW
 };
 use winapi::um::dwmapi::DwmSetWindowAttribute;
 use winapi::shared::windef::HWND;
 
-use crate::{autostart, events};
+use crate::{autostart, events, utils};
 
 const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
 const WIDGET_SIZE: (i32, i32) = (250, 75);
-const WIDGET_POSITION: (i32, i32) = (285, 150);
 const BACKGROUND_COLOR: Option<[u8; 3]> = Some([152, 251, 152]);
+
+static ICONO_BYTES: &[u8] = include_bytes!("../icono.ico");
 
 pub struct UI {
     #[allow(dead_code)]
@@ -37,13 +37,12 @@ pub struct Tray {
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     nwg::init()?;
 
-    let screen_width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
-    let screen_height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+    let position = utils::load_position();
 
     let mut window = nwg::Window::default();
     nwg::Window::builder()
         .size(WIDGET_SIZE)
-        .position((screen_width - WIDGET_POSITION.0, screen_height - WIDGET_POSITION.1))
+        .position(position)
         .title("Aniversario 100 - EELC")
         .flags(nwg::WindowFlags::POPUP | nwg::WindowFlags::VISIBLE)
         .ex_flags(WS_EX_TOOLWINDOW)
@@ -130,10 +129,9 @@ fn create_ui(window: &nwg::Window) -> Result<UI, Box<dyn std::error::Error>> {
 
 
 fn create_tray(window: &nwg::Window) -> Result<Tray, Box<dyn std::error::Error>> {
-    let icon_data = include_bytes!("../icono.ico");
     let mut icon = nwg::Icon::default();
     nwg::Icon::builder()
-        .source_bin(Some(icon_data))
+        .source_bin(Some(ICONO_BYTES))
         .build(&mut icon)?;
 
     let mut tray = nwg::TrayNotification::default();
@@ -206,4 +204,21 @@ pub fn toggle_timer(window_handle: nwg::ControlHandle, start: bool) {
 
 fn start_timer(window: &nwg::Window) {
     toggle_timer(window.handle, true);
+}
+
+
+pub fn create_notification(days: i64, tray: &nwg::TrayNotification) {
+    let text = match days {
+        30 => Some("🎉¡Queda un mes para el gran aniversario!🎉"),
+        7 => Some("⏳¡Queda solo 1 semana para celebrar los 100 años!⏳"),
+        0 => Some("🎊¡Mañana es el gran aniversario de los 100 años! 🎊"),
+        _ => None,
+    };
+    let mut icon = nwg::Icon::default();
+    nwg::Icon::builder()
+        .source_bin(Some(ICONO_BYTES))
+        .build(&mut icon)
+        .expect("Error icono notificacion");
+
+    tray.show("Aniversario 100 años", Some(text.expect("Error")), None, Some(&icon));
 }

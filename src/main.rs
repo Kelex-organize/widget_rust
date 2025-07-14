@@ -3,6 +3,7 @@
 mod gui;
 mod autostart;
 mod events;
+mod utils;
 
 fn main() {
     if let Err(e) = gui::run() {

@@ -5,7 +5,7 @@ use winapi::shared::windef::{HWND, POINT};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use chrono_tz::America::Montevideo;
 
-use crate::{autostart, gui};
+use crate::{autostart, gui, utils};
 
 pub fn attach_event_handler(ui: Rc<RefCell<gui::UI>>, tray: Rc<RefCell<gui::Tray>>) {
     let window_handle = ui.borrow().window.handle;
@@ -22,11 +22,13 @@ pub fn attach_event_handler(ui: Rc<RefCell<gui::UI>>, tray: Rc<RefCell<gui::Tray
                 let tray_ref = tray.borrow();
 
                 if handle == tray_ref.mostrar_item.handle { show_window(&ui); }
-                if handle == tray_ref.cerrar_item.handle { close_window(ui.borrow().window.handle); }
+                if handle == tray_ref.cerrar_item.handle { close_window(&ui.borrow().window); }
                 if handle == tray_ref.autostart_item.handle { autostart_app(&tray_ref.autostart_item); }
             }
 
-            nwg::Event::OnTimerTick => { update_countdown_label(&ui); }
+            nwg::Event::OnTimerTick => { update_countdown_label(&ui, &tray); }
+
+            nwg::Event::OnWindowClose => { if handle == ui.borrow().window.handle { utils::save_position(ui.borrow().window.position()); } }
 
             _ => {}
         }
@@ -62,8 +64,9 @@ fn show_window(ui: &Rc<RefCell<gui::UI>>) {
 }
 
 
-fn close_window(window_handle: nwg::ControlHandle) {
-    crate::gui::toggle_timer(window_handle, false);
+fn close_window(window: &nwg::Window) {
+    crate::gui::toggle_timer(window.handle, false);
+    utils::save_position(window.position());
     nwg::stop_thread_dispatch();
 }
 
@@ -75,9 +78,9 @@ fn autostart_app(autostart_item: &nwg::MenuItem) {
 }
 
 
-fn update_countdown_label(ui: &Rc<RefCell<gui::    UI>>) {
+fn update_countdown_label(ui: &Rc<RefCell<gui::UI>>, tray: &Rc<RefCell<gui::Tray>>) {
     let date = Montevideo.with_ymd_and_hms(2026, 7, 4, 0, 0, 0).unwrap();
-    let text = countdown_time(date);
+    let text = countdown_time(date, &tray.borrow_mut().tray);
 
     ui.borrow_mut().countdown_label.set_text(&text);
     if text == "Esperanza en la Ciudad" {
@@ -86,7 +89,7 @@ fn update_countdown_label(ui: &Rc<RefCell<gui::    UI>>) {
 }
 
 
-fn countdown_time(date: DateTime<chrono_tz::Tz>) -> String {
+fn countdown_time(date: DateTime<chrono_tz::Tz>, tray: &nwg::TrayNotification) -> String {
     let now = Utc::now();
     let date_utc = date.with_timezone(&Utc);
     let duration = date_utc - now;
@@ -99,6 +102,17 @@ fn countdown_time(date: DateTime<chrono_tz::Tz>) -> String {
         let hours = (total_seconds % 86_400) / 3600;
         let minutes = (total_seconds % 3600) / 60;
         let seconds = total_seconds % 60;
+
+        match days {
+            30 | 7 | 0 => {
+                let notified = utils::is_notificated(days);
+                if !notified {
+                    utils::save_notification(days);
+                    gui::create_notification(days, tray);
+                }
+            }
+            _ => {}
+        }
 
         if days > 0 {
             format!("{} días, {:02}:{:02}:{:02}", days, hours, minutes, seconds)
