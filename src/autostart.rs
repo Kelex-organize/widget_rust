@@ -1,7 +1,7 @@
 use std::env;
 use winreg::{enums::*, RegKey};
 
-const APP_REG_NAME: &str = "Aniversario100CuentaRegresiva";
+const APP_REG_NAME: &str = "Aniversario100-EELC";
 
 pub fn set_enabled(enable: bool) {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);

@@ -1,9 +1,12 @@
 {
   "notification": {
-    "notified": []
+    "notified": [
+      0,
+      100
+    ]
   },
   "position": {
-    "x": 957,
-    "y": 666
+    "x": 1285,
+    "y": 294
   }
 }

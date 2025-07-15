@@ -212,6 +212,7 @@ pub fn create_notification(days: i64, tray: &nwg::TrayNotification) {
         30 => Some("🎉¡Queda un mes para el gran aniversario!🎉"),
         7 => Some("⏳¡Queda solo 1 semana para celebrar los 100 años!⏳"),
         0 => Some("🎊¡Mañana es el gran aniversario de los 100 años! 🎊"),
+        100 => Some("🎉 ¡Feliz Aniversario de 100 AÑOS! 🥳"),
         _ => None,
     };
     let mut icon = nwg::Icon::default();
@@ -220,5 +221,5 @@ pub fn create_notification(days: i64, tray: &nwg::TrayNotification) {
         .build(&mut icon)
         .expect("Error icono notificacion");
 
-    tray.show("Aniversario 100 años", Some(text.expect("Error")), None, Some(&icon));
+    tray.show("Aniversario 100 años - Esperanza en la Ciudad", Some(text.expect("Error")), None, Some(&icon));
 }

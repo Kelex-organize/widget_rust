@@ -1,14 +1,16 @@
 use native_windows_gui as nwg;
-use winapi::um::winuser::{GetCursorPos, ReleaseCapture, SendMessageW, WM_NCLBUTTONDOWN, HTCAPTION};
+use winapi::um::winuser::{GetCursorPos, ReleaseCapture, SendMessageW, WM_NCLBUTTONDOWN, HTCAPTION, WM_EXITSIZEMOVE};
 use std::{rc::Rc, cell::RefCell};
 use winapi::shared::windef::{HWND, POINT};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use chrono_tz::America::Montevideo;
+use winapi::shared::basetsd::UINT_PTR;
 
 use crate::{autostart, gui, utils};
 
 pub fn attach_event_handler(ui: Rc<RefCell<gui::UI>>, tray: Rc<RefCell<gui::Tray>>) {
     let window_handle = ui.borrow().window.handle;
+    let ui_clone = ui.clone();
 
     nwg::full_bind_event_handler(&window_handle, move |evt, _evt_data, handle| {
         match evt {
@@ -22,7 +24,7 @@ pub fn attach_event_handler(ui: Rc<RefCell<gui::UI>>, tray: Rc<RefCell<gui::Tray
                 let tray_ref = tray.borrow();
 
                 if handle == tray_ref.mostrar_item.handle { show_window(&ui); }
-                if handle == tray_ref.cerrar_item.handle { close_window(&ui.borrow().window); }
+                if handle == tray_ref.cerrar_item.handle { close_window(ui.borrow().window.handle); }
                 if handle == tray_ref.autostart_item.handle { autostart_app(&tray_ref.autostart_item); }
             }
 
@@ -33,6 +35,8 @@ pub fn attach_event_handler(ui: Rc<RefCell<gui::UI>>, tray: Rc<RefCell<gui::Tray
             _ => {}
         }
     });
+
+    attach_raw_event_handler(ui_clone, &window_handle);
 }
 
 
@@ -64,9 +68,8 @@ fn show_window(ui: &Rc<RefCell<gui::UI>>) {
 }
 
 
-fn close_window(window: &nwg::Window) {
-    crate::gui::toggle_timer(window.handle, false);
-    utils::save_position(window.position());
+fn close_window(window_handle: nwg::ControlHandle) {
+    crate::gui::toggle_timer(window_handle, false);
     nwg::stop_thread_dispatch();
 }
 
@@ -80,11 +83,17 @@ fn autostart_app(autostart_item: &nwg::MenuItem) {
 
 fn update_countdown_label(ui: &Rc<RefCell<gui::UI>>, tray: &Rc<RefCell<gui::Tray>>) {
     let date = Montevideo.with_ymd_and_hms(2026, 7, 4, 0, 0, 0).unwrap();
-    let text = countdown_time(date, &tray.borrow_mut().tray);
+    let text = countdown_time(date, &tray.borrow().tray);
 
     ui.borrow_mut().countdown_label.set_text(&text);
     if text == "Esperanza en la Ciudad" {
         ui.borrow_mut().text_label.set_text("¡Feliz Aniversario!");
+        let notified = utils::is_notificated(100);
+        if !notified {
+            utils::save_notification(100);
+            gui::create_notification(100, &tray.borrow().tray);
+        }
+        gui::toggle_timer(ui.borrow().window.handle, false);
     }
 }
 
@@ -96,6 +105,7 @@ fn countdown_time(date: DateTime<chrono_tz::Tz>, tray: &nwg::TrayNotification) -
 
     if duration < Duration::zero() {
         "Esperanza en la Ciudad".to_string()
+        
     } else {
         let total_seconds = duration.num_seconds();
         let days = total_seconds / 86_400;
@@ -120,4 +130,16 @@ fn countdown_time(date: DateTime<chrono_tz::Tz>, tray: &nwg::TrayNotification) -
             format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
         }
     }
+}
+
+
+fn attach_raw_event_handler(ui: Rc<RefCell<gui::UI>>, window_handle: &nwg::ControlHandle) {
+    let ui_clone = ui.clone();
+    nwg::bind_raw_event_handler(window_handle, 0x10001 as UINT_PTR, move |_hwnd, msg, _wparam, _lparam| {
+        if msg == WM_EXITSIZEMOVE {
+            let pos = ui_clone.borrow().window.position();
+            utils::save_position(pos);
+        }
+        None
+    }).expect("Fallo al agregar raw_event_handler para movimiento de ventana");
 }
