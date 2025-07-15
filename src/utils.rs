@@ -67,18 +67,14 @@ pub fn save_position(position: (i32, i32)) {
 }
 
 
-static NOTIFIED_IDS: Lazy<Mutex<HashSet<i64>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static NOTIFIED_IDS: Lazy<Mutex<HashSet<i64>>> = Lazy::new(|| {
+    let config = load_config();
+    let hs: HashSet<i64> = config.notification.notified.into_iter().collect();
+    Mutex::new(hs)
+});
 
 pub fn is_notificated(id: i64) -> bool {
-    let mut notified = NOTIFIED_IDS.lock().unwrap();
-
-    if notified.is_empty() {
-        let config = load_config();
-        for n in config.notification.notified {
-            notified.insert(n);
-        }
-    }
-
+    let notified = NOTIFIED_IDS.lock().unwrap();
     notified.contains(&id)
 }
 
